@@ -1,60 +1,206 @@
-# Biblioteca en Solana
+# 🕹️ Arcade Hall Solana
 
-![banner](./images/banner-biblioteca.jpg)
 
-CRUD básico de un Solana Program desarrollado con Rust y Anchor desde el Solana Playground. 
+Sistema de gestión de récords arcade desarrollado como **Solana Program** utilizando **Rust** y el framework **Anchor**.  
 
-Puedes comenzar dándole Fork a este repositorio (abajo te explicamos como 👇), **hemos preparado un entorno de codespaces listo para que no tengas que instalar nada**, solo déjate llevar por la fluidez de los ejercicios y temas desarrollados especialmente para ti. 
+Este proyecto implementa un sistema **CRUD** para registrar y administrar puntuaciones en un Salón de la Fama directamente en blockchain, garantizando:
 
-Asegúrate de clonar este repositorio a tu cuenta usando el botón **`Fork`**.
+- 🔑 Uso de Program Derived Addresses (PDAs)  
+- ⚡ Optimización de memoria *On-Chain*  
+- 🔒 Seguridad basada en firmas  
 
-![fork](./images/fork.png)
+---
 
-## Importando el proyecto 
+## 📚 Descripción
 
-Ya con el repositorio en tu cuenta lo siguiente que debes hacer copiar el `enlace de tu repositorio`, lo que se puede hacer directamente desdel navegador:
+**Arcade Hall Solana** simula un sistema de puntuaciones donde un administrador puede:
 
-![repo](./images/repo.png)
-Posteriormente, lo uniremos con el siguiente enlace en nuestro navegador de preferencia:
+- Inicializar un salón arcade  
+- Registrar récords de distintos juegos  
+- Actualizar puntuaciones y jugadores  
+- Eliminar récords  
+- Consultar la lista completa en blockchain  
 
-```url
-https://beta.solpg.io/
+---
+
+## 🧠 Arquitectura y Estructuras de Datos
+
+En Solana es necesario definir el tamaño de los datos para calcular correctamente la renta (*rent*).
+
+### 📦 PDA Principal: `ArcadeLedger`
+
+Cuenta raíz que almacena todos los récords del arcade.
+
+```rust
+#[account]
+#[derive(InitSpace)]
+pub struct ArcadeLedger {
+    pub owner: Pubkey,
+    #[max_len(40)]
+    pub nombre_arcade: String,
+    #[max_len(15)]
+    pub records: Vec<Record>,
+}
 ```
 
-Lo que nos dará algo parecido a:
+---
 
-![url](./images/url.png)
+### 🧩 Estructura Interna: `Record`
 
-Al pulsar enter seremos enviados al `Solana Playground` con nuestro proyecto abierto:
+Cada récord contiene:
 
-![pg](./images/pg.png)
+- `nombre_juego (String)` → nombre del juego  
+- `puntuacion_maxima (u32)` → mejor puntuación registrada  
+- `nombre_jugador (String)` → jugador que logró el récord  
 
-Para guardarlo solo damos clic en el boton `import` y asignamos un nombre:
+```rust
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace, PartialEq, Debug)]
+pub struct Record {
+    #[max_len(25)]
+    pub nombre_juego: String,
+    pub puntuacion_maxima: u32,
+    #[max_len(25)]
+    pub nombre_jugador: String,
+}
+```
 
-![import](./images/import.png)
+---
 
-## Preparacion del entorno
+## 🔒 Seguridad
 
-Primero conectaremos el entorno con la devnet, lo que tambien procederá a la creación de una wallet. Para eso daremos clic en donde dice **Not Conected**:
+El contrato valida que solo el propietario pueda modificar el sistema:
 
-![playground1](./images/playground1.png)
+```rust
+require!(
+    ledger.owner == ctx.accounts.owner.key(),
+    Errores::NoAutorizado
+);
+```
 
-Saldrá la siguiente ventana donde daremos en el botón **Continue**:
+✔ Protege la integridad de los récords  
+✔ Evita modificaciones no autorizadas  
 
-![wallet](./images/wallet.png)
+---
 
-Como resultado se mostrará la siguiente información:
+## ⚙️ Funcionalidad (CRUD)
 
-![status](./images/status.png)
+### 🟢 Inicializar Arcade
 
-* En verde: el estado de la conexión y el entorno al que se encuentra conectado
+Crea la cuenta principal usando:
 
-* En amarillo: la la dirección de la wallet conectada
+```rust
+[b"arcade", owner.key().as_ref()]
+```
 
-* En azul: la cantidad de tokens en la wallet
+Inicializa:
+- Owner  
+- Nombre del arcade  
+- Lista vacía de récords  
 
-> ℹ️ ¿Quieres ver el ejemplo de un "Hola Mundo" en Solana?. Da clic aquí: 👉 [Ver Ejemplo](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/build-deploy)
+---
 
-> ℹ️ ¿Cuentas con una Wallet de [Phantom](https://phantom.com/) que deseas importar?, Da clic aquí para ver como hacerlo: 
+### ➕ Registrar Récord
 
-👉 [Como Importar una Wallet](https://github.com/WayLearnLatam/Solana-starter-kit/tree/1fc6349ba63375a3fe223d8d56911bc64765459b/import-key-a-playground)
+- Recibe:
+  - juego  
+  - puntuación  
+  - jugador  
+- Inserta en el vector con `.push()`  
+
+---
+
+### ✏️ Editar Récord
+
+- Busca por `nombre_juego`  
+- Actualiza:
+  - puntuación  
+  - jugador  
+
+---
+
+### ❌ Eliminar Récord
+
+```rust
+.iter().position(|r| r.nombre_juego == juego)
+```
+
+- Si existe → `.remove(index)`  
+- Si no → error `RecordNoEncontrado`  
+
+---
+
+### 📖 Ver Récords
+
+```rust
+msg!("Lista de Honor: {:#?}", ledger.records);
+```
+
+Muestra todos los récords en logs *On-Chain*
+
+---
+
+## 🧪 Despliegue en Solana Playground
+
+1. Copia el código en `lib.rs`  
+2. Ejecuta:
+
+```bash
+cargo clean
+```
+
+3. Haz clic en **Build**  
+4. Haz clic en **Deploy (Devnet)**  
+
+---
+
+## 🧑‍💻 Pruebas
+
+Puedes interactuar con el contrato usando:
+
+- Pestaña **Test** del Playground  
+- Scripts en TypeScript:
+
+```ts
+pg.program.methods...
+```
+
+Parámetros:
+- `juego: String`  
+- `puntuacion: u32`  
+- `jugador: String`  
+
+---
+
+## ⚠️ Manejo de Errores
+
+```rust
+#[error_code]
+pub enum Errores {
+    #[msg("No tienes permisos para modificar este Salón de la Fama.")]
+    NoAutorizado,
+    #[msg("El récord solicitado no existe en el registro.")]
+    RecordNoEncontrado,
+}
+```
+
+---
+
+## 📌 Conclusión
+
+Este proyecto demuestra:
+
+- Gestión de rankings en blockchain  
+- Seguridad mediante validación de firmas  
+- Uso eficiente de estructuras dinámicas  
+- Implementación de CRUD en un caso práctico (Arcade Hall)  
+
+---
+
+## 🚀 Próximos pasos
+
+- Crear ranking automático por puntuación  
+- Permitir múltiples récords por juego  
+- Integrar frontend visual (leaderboard)  
+- Añadir recompensas con tokens SPL  
+
+---
